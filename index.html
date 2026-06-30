@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EkoPass Scanner</title>
+  <script src="https://unpkg.com/html5-qrcode"></script>
+  <style>
+    body { margin:0; background:#000; color:#fff; font-family:Arial; text-align:center; }
+    header { padding:20px; border-bottom:2px solid #D4AF37; }
+    h1 { color:#D4AF37; letter-spacing:4px; margin:0; }
+    #reader { width:90%; max-width:420px; margin:30px auto; border:2px solid #D4AF37; border-radius:16px; overflow:hidden; }
+    #result { width:90%; max-width:420px; margin:20px auto; padding:20px; border:1px solid #D4AF37; border-radius:18px; background:#111; }
+    .success { color:#00C853; }
+    .used { color:#D4AF37; }
+    .error { color:#D50000; }
+    .name { font-size:26px; font-weight:bold; margin-top:10px; }
+    .details { font-size:18px; margin-top:12px; line-height:1.5; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>EKOPASS</h1>
+  <p>EKO MI AWARDS 2026 — RECEPTION MODE</p>
+</header>
+
+<div id="reader"></div>
+
+<div id="result">
+  <h2>Waiting for QR Scan...</h2>
+  <p>Point camera at guest invitation QR code.</p>
+</div>
+
+<script>
+  const BACKEND_URL = "https://script.google.com/macros/s/AKfycbyj7Xvp6DeqNVkLcQa-VDq843MS8zsZUOCg4T1bLIufD5cH3chbfxxEKUVJio33E8GG/exec";
+
+  let scanner;
+
+  function startScanner() {
+    scanner = new Html5Qrcode("reader");
+
+    scanner.start(
+      { facingMode: "environment" },
+      { fps: 10, qrbox: { width: 250, height: 250 } },
+      onScanSuccess
+    ).catch(err => {
+      document.getElementById("result").innerHTML =
+        `<h2 class="error">Camera Error</h2><p>${err}</p>`;
+    });
+  }
+
+  function onScanSuccess(decodedText) {
+    scanner.pause();
+
+    document.getElementById("result").innerHTML = "<h2>Checking guest...</h2>";
+
+    const token = extractToken(decodedText);
+    const callbackName = "ekopassCallback_" + Date.now();
+
+    window[callbackName] = function(response) {
+      showResult(response);
+      delete window[callbackName];
+      script.remove();
+    };
+
+    const script = document.createElement("script");
+    script.src = BACKEND_URL + "?api=checkin&token=" + encodeURIComponent(token) + "&callback=" + callbackName;
+    document.body.appendChild(script);
+  }
+
+  function extractToken(text) {
+    try {
+      const url = new URL(text);
+      return url.searchParams.get("token") || text;
+    } catch (e) {
+      return text;
+    }
+  }
+
+  function showResult(response) {
+    document.getElementById("result").innerHTML = `
+      <h2 class="${response.statusType}">${response.title}</h2>
+      <div class="name">${response.name || ""}</div>
+      <div class="details">
+        ${response.category ? "Category: " + response.category + "<br>" : ""}
+        ${response.table ? "Table: " + response.table + "<br>" : ""}
+        ${response.message || ""}
+      </div>
+    `;
+
+    setTimeout(() => {
+      document.getElementById("result").innerHTML =
+        "<h2>Waiting for QR Scan...</h2><p>Point camera at next guest invitation QR code.</p>";
+      scanner.resume();
+    }, 4000);
+  }
+
+  startScanner();
+</script>
+
+</body>
+</html>
