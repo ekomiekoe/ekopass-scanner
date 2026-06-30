@@ -40,22 +40,39 @@
     #reader {
       width: 92%;
       max-width: 430px;
-      margin: 28px auto 18px;
+      margin: 22px auto 14px;
       border: 2px solid #D4AF37;
       border-radius: 22px;
       overflow: hidden;
       background: #111;
+      box-shadow: 0 0 28px rgba(212,175,55,0.25);
     }
 
     #result {
       width: 92%;
       max-width: 430px;
-      margin: 18px auto;
+      margin: 14px auto;
       padding: 24px 18px;
       border: 1px solid #D4AF37;
       border-radius: 24px;
       background: #111;
       min-height: 170px;
+      transition: all 0.25s ease;
+    }
+
+    #result.success-card {
+      border-color: #00C853;
+      box-shadow: 0 0 35px rgba(0,200,83,0.45);
+    }
+
+    #result.used-card {
+      border-color: #D4AF37;
+      box-shadow: 0 0 35px rgba(212,175,55,0.45);
+    }
+
+    #result.error-card {
+      border-color: #D50000;
+      box-shadow: 0 0 35px rgba(213,0,0,0.45);
     }
 
     .waiting { color: #D4AF37; }
@@ -63,10 +80,42 @@
     .used { color: #D4AF37; }
     .error { color: #D50000; }
 
-    .icon { font-size: 52px; margin-bottom: 10px; }
-    .title { font-size: 28px; font-weight: 900; margin-bottom: 14px; }
-    .name { font-size: 25px; font-weight: 900; margin-bottom: 18px; }
-    .details { font-size: 17px; line-height: 1.6; color: #ddd; }
+    .icon {
+      font-size: 54px;
+      margin-bottom: 10px;
+      font-weight: 900;
+    }
+
+    .title {
+      font-size: 28px;
+      font-weight: 900;
+      margin-bottom: 14px;
+      text-transform: uppercase;
+    }
+
+    .name {
+      font-size: 25px;
+      font-weight: 900;
+      margin-bottom: 18px;
+    }
+
+    .details {
+      font-size: 17px;
+      line-height: 1.6;
+      color: #ddd;
+    }
+
+    .countdown {
+      margin-top: 18px;
+      font-size: 15px;
+      color: #bbb;
+    }
+
+    .count-number {
+      color: #D4AF37;
+      font-size: 26px;
+      font-weight: 900;
+    }
 
     button {
       margin-top: 18px;
@@ -80,9 +129,17 @@
     }
 
     .footer {
-      margin: 24px 0;
+      margin: 20px 0;
       color: #777;
       font-size: 12px;
+      letter-spacing: 1px;
+    }
+
+    @media (max-width: 480px) {
+      .brand { font-size: 24px; }
+      .title { font-size: 25px; }
+      .name { font-size: 24px; }
+      .details { font-size: 16px; }
     }
   </style>
 </head>
@@ -138,6 +195,10 @@
       };
 
       const script = document.createElement("script");
+      script.onerror = function() {
+        showError("CONNECTION ERROR", "Unable to reach EkoPass backend. Check internet connection and try again.");
+      };
+
       script.src = BACKEND_URL + "?api=checkin&token=" + encodeURIComponent(token) + "&callback=" + callbackName;
       document.body.appendChild(script);
     }
@@ -151,8 +212,18 @@
       }
     }
 
+    function vibrate(type) {
+      try {
+        if (!navigator.vibrate) return;
+        if (type === "success") navigator.vibrate(120);
+        else navigator.vibrate([180, 80, 180]);
+      } catch (e) {}
+    }
+
     function showLoading() {
-      document.getElementById("result").innerHTML = `
+      const result = document.getElementById("result");
+      result.className = "";
+      result.innerHTML = `
         <div class="icon">...</div>
         <div class="title waiting">CHECKING GUEST...</div>
         <div class="details">Please wait.</div>
@@ -160,22 +231,35 @@
     }
 
     function showResult(response) {
+      const status = response.statusType || "error";
+
       const icon =
-        response.statusType === "success" ? "OK" :
-        response.statusType === "used" ? "USED" : "NO";
+        status === "success" ? "OK" :
+        status === "used" ? "USED" : "NO";
+
+      const cardClass =
+        status === "success" ? "success-card" :
+        status === "used" ? "used-card" : "error-card";
+
+      vibrate(status);
 
       let seconds = 5;
 
-      document.getElementById("result").innerHTML = `
-        <div class="icon">${icon}</div>
-        <div class="title ${response.statusType}">${response.title}</div>
+      const result = document.getElementById("result");
+      result.className = cardClass;
+
+      result.innerHTML = `
+        <div class="icon ${status}">${icon}</div>
+        <div class="title ${status}">${response.title || "UNKNOWN STATUS"}</div>
         <div class="name">${response.name || ""}</div>
         <div class="details">
           ${response.category ? "Category: " + response.category + "<br>" : ""}
           ${response.table ? "Table: " + response.table + "<br>" : ""}
           ${response.message || ""}
-          <br><br>
-          Returning to scanner in <strong id="countdown">5</strong> seconds
+          <div class="countdown">
+            Returning to scanner in<br>
+            <span class="count-number" id="countdown">5</span> seconds
+          </div>
         </div>
         <button onclick="resetScanner()">SCAN NEXT NOW</button>
       `;
@@ -192,10 +276,14 @@
     }
 
     function showError(title, message) {
-      document.getElementById("result").innerHTML = `
-        <div class="icon">NO</div>
+      vibrate("error");
+      const result = document.getElementById("result");
+      result.className = "error-card";
+      result.innerHTML = `
+        <div class="icon error">NO</div>
         <div class="title error">${title}</div>
         <div class="details">${message}</div>
+        <button onclick="resetScanner()">TRY AGAIN</button>
       `;
     }
 
@@ -203,7 +291,9 @@
       clearInterval(countdownTimer);
       isProcessing = false;
 
-      document.getElementById("result").innerHTML = `
+      const result = document.getElementById("result");
+      result.className = "";
+      result.innerHTML = `
         <div class="icon">CAM</div>
         <div class="title waiting">READY TO SCAN</div>
         <div class="details">Point the camera at the next guest invitation QR code.</div>
