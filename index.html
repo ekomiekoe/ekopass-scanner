@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>EkoPass Scanner</title>
   <script src="https://unpkg.com/html5-qrcode"></script>
@@ -34,7 +35,6 @@
       margin-top: 8px;
       font-size: 13px;
       color: #ccc;
-      letter-spacing: 1px;
     }
 
     #reader {
@@ -45,7 +45,6 @@
       border-radius: 22px;
       overflow: hidden;
       background: #111;
-      box-shadow: 0 0 35px rgba(212,175,55,0.25);
     }
 
     #result {
@@ -55,8 +54,7 @@
       padding: 24px 18px;
       border: 1px solid #D4AF37;
       border-radius: 24px;
-      background: linear-gradient(145deg, #060606, #121212);
-      box-shadow: 0 0 35px rgba(212,175,55,0.18);
+      background: #111;
       min-height: 170px;
     }
 
@@ -65,35 +63,10 @@
     .used { color: #D4AF37; }
     .error { color: #D50000; }
 
-    .icon {
-      font-size: 52px;
-      margin-bottom: 10px;
-    }
-
-    .title {
-      font-size: 28px;
-      font-weight: 900;
-      margin-bottom: 14px;
-    }
-
-    .name {
-      font-size: 25px;
-      font-weight: 900;
-      margin-bottom: 18px;
-    }
-
-    .details {
-      font-size: 17px;
-      line-height: 1.6;
-      color: #ddd;
-    }
-
-    .footer {
-      margin: 24px 0;
-      color: #777;
-      font-size: 12px;
-      letter-spacing: 1px;
-    }
+    .icon { font-size: 52px; margin-bottom: 10px; }
+    .title { font-size: 28px; font-weight: 900; margin-bottom: 14px; }
+    .name { font-size: 25px; font-weight: 900; margin-bottom: 18px; }
+    .details { font-size: 17px; line-height: 1.6; color: #ddd; }
 
     button {
       margin-top: 18px;
@@ -104,6 +77,12 @@
       padding: 14px 22px;
       font-weight: 900;
       font-size: 15px;
+    }
+
+    .footer {
+      margin: 24px 0;
+      color: #777;
+      font-size: 12px;
     }
   </style>
 </head>
@@ -117,7 +96,7 @@
   <div id="reader"></div>
 
   <div id="result">
-    <div class="icon">📷</div>
+    <div class="icon">CAM</div>
     <div class="title waiting">READY TO SCAN</div>
     <div class="details">Point the camera at a guest invitation QR code.</div>
   </div>
@@ -129,6 +108,7 @@
 
     let scanner;
     let isProcessing = false;
+    let countdownTimer;
 
     function startScanner() {
       scanner = new Html5Qrcode("reader");
@@ -145,8 +125,6 @@
     function onScanSuccess(decodedText) {
       if (isProcessing) return;
       isProcessing = true;
-
-      try { navigator.vibrate && navigator.vibrate(120); } catch(e) {}
 
       showLoading();
 
@@ -175,7 +153,7 @@
 
     function showLoading() {
       document.getElementById("result").innerHTML = `
-        <div class="icon">⏳</div>
+        <div class="icon">...</div>
         <div class="title waiting">CHECKING GUEST...</div>
         <div class="details">Please wait.</div>
       `;
@@ -183,8 +161,10 @@
 
     function showResult(response) {
       const icon =
-        response.statusType === "success" ? "✅" :
-        response.statusType === "used" ? "⚠️" : "❌";
+        response.statusType === "success" ? "OK" :
+        response.statusType === "used" ? "USED" : "NO";
+
+      let seconds = 5;
 
       document.getElementById("result").innerHTML = `
         <div class="icon">${icon}</div>
@@ -194,25 +174,37 @@
           ${response.category ? "Category: " + response.category + "<br>" : ""}
           ${response.table ? "Table: " + response.table + "<br>" : ""}
           ${response.message || ""}
+          <br><br>
+          Returning to scanner in <strong id="countdown">5</strong> seconds
         </div>
-        <button onclick="resetScanner()">SCAN NEXT</button>
+        <button onclick="resetScanner()">SCAN NEXT NOW</button>
       `;
 
-      setTimeout(resetScanner, 5000);
+      countdownTimer = setInterval(() => {
+        seconds--;
+        const countdown = document.getElementById("countdown");
+        if (countdown) countdown.textContent = seconds;
+
+        if (seconds <= 0) {
+          resetScanner();
+        }
+      }, 1000);
     }
 
     function showError(title, message) {
       document.getElementById("result").innerHTML = `
-        <div class="icon">❌</div>
+        <div class="icon">NO</div>
         <div class="title error">${title}</div>
         <div class="details">${message}</div>
       `;
     }
 
     function resetScanner() {
+      clearInterval(countdownTimer);
       isProcessing = false;
+
       document.getElementById("result").innerHTML = `
-        <div class="icon">📷</div>
+        <div class="icon">CAM</div>
         <div class="title waiting">READY TO SCAN</div>
         <div class="details">Point the camera at the next guest invitation QR code.</div>
       `;
