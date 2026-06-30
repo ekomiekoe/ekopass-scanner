@@ -4,99 +4,221 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>EkoPass Scanner</title>
   <script src="https://unpkg.com/html5-qrcode"></script>
+
   <style>
-    body { margin:0; background:#000; color:#fff; font-family:Arial; text-align:center; }
-    header { padding:20px; border-bottom:2px solid #D4AF37; }
-    h1 { color:#D4AF37; letter-spacing:4px; margin:0; }
-    #reader { width:90%; max-width:420px; margin:30px auto; border:2px solid #D4AF37; border-radius:16px; overflow:hidden; }
-    #result { width:90%; max-width:420px; margin:20px auto; padding:20px; border:1px solid #D4AF37; border-radius:18px; background:#111; }
-    .success { color:#00C853; }
-    .used { color:#D4AF37; }
-    .error { color:#D50000; }
-    .name { font-size:26px; font-weight:bold; margin-top:10px; }
-    .details { font-size:18px; margin-top:12px; line-height:1.5; }
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: radial-gradient(circle at top, #2b2108, #000 45%);
+      color: #fff;
+      font-family: Arial, sans-serif;
+      text-align: center;
+      min-height: 100vh;
+    }
+
+    header {
+      padding: 22px 16px;
+      border-bottom: 2px solid #D4AF37;
+      background: #050505;
+    }
+
+    .brand {
+      color: #D4AF37;
+      font-size: 28px;
+      font-weight: 900;
+      letter-spacing: 5px;
+    }
+
+    .event {
+      margin-top: 8px;
+      font-size: 13px;
+      color: #ccc;
+      letter-spacing: 1px;
+    }
+
+    #reader {
+      width: 92%;
+      max-width: 430px;
+      margin: 28px auto 18px;
+      border: 2px solid #D4AF37;
+      border-radius: 22px;
+      overflow: hidden;
+      background: #111;
+      box-shadow: 0 0 35px rgba(212,175,55,0.25);
+    }
+
+    #result {
+      width: 92%;
+      max-width: 430px;
+      margin: 18px auto;
+      padding: 24px 18px;
+      border: 1px solid #D4AF37;
+      border-radius: 24px;
+      background: linear-gradient(145deg, #060606, #121212);
+      box-shadow: 0 0 35px rgba(212,175,55,0.18);
+      min-height: 170px;
+    }
+
+    .waiting { color: #D4AF37; }
+    .success { color: #00C853; }
+    .used { color: #D4AF37; }
+    .error { color: #D50000; }
+
+    .icon {
+      font-size: 52px;
+      margin-bottom: 10px;
+    }
+
+    .title {
+      font-size: 28px;
+      font-weight: 900;
+      margin-bottom: 14px;
+    }
+
+    .name {
+      font-size: 25px;
+      font-weight: 900;
+      margin-bottom: 18px;
+    }
+
+    .details {
+      font-size: 17px;
+      line-height: 1.6;
+      color: #ddd;
+    }
+
+    .footer {
+      margin: 24px 0;
+      color: #777;
+      font-size: 12px;
+      letter-spacing: 1px;
+    }
+
+    button {
+      margin-top: 18px;
+      background: #D4AF37;
+      color: #000;
+      border: none;
+      border-radius: 14px;
+      padding: 14px 22px;
+      font-weight: 900;
+      font-size: 15px;
+    }
   </style>
 </head>
+
 <body>
+  <header>
+    <div class="brand">EKOPASS</div>
+    <div class="event">EKO MI AWARDS 2026 — RECEPTION SCANNER</div>
+  </header>
 
-<header>
-  <h1>EKOPASS</h1>
-  <p>EKO MI AWARDS 2026 — RECEPTION MODE</p>
-</header>
+  <div id="reader"></div>
 
-<div id="reader"></div>
+  <div id="result">
+    <div class="icon">📷</div>
+    <div class="title waiting">READY TO SCAN</div>
+    <div class="details">Point the camera at a guest invitation QR code.</div>
+  </div>
 
-<div id="result">
-  <h2>Waiting for QR Scan...</h2>
-  <p>Point camera at guest invitation QR code.</p>
-</div>
+  <div class="footer">POWERED BY EKOPASS</div>
 
-<script>
-  const BACKEND_URL = "https://script.google.com/macros/s/AKfycbyj7Xvp6DeqNVkLcQa-VDq843MS8zsZUOCg4T1bLIufD5cH3chbfxxEKUVJio33E8GG/exec";
+  <script>
+    const BACKEND_URL = "https://script.google.com/macros/s/AKfycbyj7Xvp6DeqNVkLcQa-VDq843MS8zsZUOCg4T1bLIufD5cH3chbfxxEKUVJio33E8GG/exec";
 
-  let scanner;
+    let scanner;
+    let isProcessing = false;
 
-  function startScanner() {
-    scanner = new Html5Qrcode("reader");
+    function startScanner() {
+      scanner = new Html5Qrcode("reader");
 
-    scanner.start(
-      { facingMode: "environment" },
-      { fps: 10, qrbox: { width: 250, height: 250 } },
-      onScanSuccess
-    ).catch(err => {
-      document.getElementById("result").innerHTML =
-        `<h2 class="error">Camera Error</h2><p>${err}</p>`;
-    });
-  }
-
-  function onScanSuccess(decodedText) {
-    scanner.pause();
-
-    document.getElementById("result").innerHTML = "<h2>Checking guest...</h2>";
-
-    const token = extractToken(decodedText);
-    const callbackName = "ekopassCallback_" + Date.now();
-
-    window[callbackName] = function(response) {
-      showResult(response);
-      delete window[callbackName];
-      script.remove();
-    };
-
-    const script = document.createElement("script");
-    script.src = BACKEND_URL + "?api=checkin&token=" + encodeURIComponent(token) + "&callback=" + callbackName;
-    document.body.appendChild(script);
-  }
-
-  function extractToken(text) {
-    try {
-      const url = new URL(text);
-      return url.searchParams.get("token") || text;
-    } catch (e) {
-      return text;
+      scanner.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: { width: 260, height: 260 } },
+        onScanSuccess
+      ).catch(err => {
+        showError("CAMERA ERROR", err);
+      });
     }
-  }
 
-  function showResult(response) {
-    document.getElementById("result").innerHTML = `
-      <h2 class="${response.statusType}">${response.title}</h2>
-      <div class="name">${response.name || ""}</div>
-      <div class="details">
-        ${response.category ? "Category: " + response.category + "<br>" : ""}
-        ${response.table ? "Table: " + response.table + "<br>" : ""}
-        ${response.message || ""}
-      </div>
-    `;
+    function onScanSuccess(decodedText) {
+      if (isProcessing) return;
+      isProcessing = true;
 
-    setTimeout(() => {
-      document.getElementById("result").innerHTML =
-        "<h2>Waiting for QR Scan...</h2><p>Point camera at next guest invitation QR code.</p>";
-      scanner.resume();
-    }, 4000);
-  }
+      try { navigator.vibrate && navigator.vibrate(120); } catch(e) {}
 
-  startScanner();
-</script>
+      showLoading();
 
+      const token = extractToken(decodedText);
+      const callbackName = "ekopassCallback_" + Date.now();
+
+      window[callbackName] = function(response) {
+        showResult(response);
+        delete window[callbackName];
+        script.remove();
+      };
+
+      const script = document.createElement("script");
+      script.src = BACKEND_URL + "?api=checkin&token=" + encodeURIComponent(token) + "&callback=" + callbackName;
+      document.body.appendChild(script);
+    }
+
+    function extractToken(text) {
+      try {
+        const url = new URL(text);
+        return url.searchParams.get("token") || text;
+      } catch (e) {
+        return text;
+      }
+    }
+
+    function showLoading() {
+      document.getElementById("result").innerHTML = `
+        <div class="icon">⏳</div>
+        <div class="title waiting">CHECKING GUEST...</div>
+        <div class="details">Please wait.</div>
+      `;
+    }
+
+    function showResult(response) {
+      const icon =
+        response.statusType === "success" ? "✅" :
+        response.statusType === "used" ? "⚠️" : "❌";
+
+      document.getElementById("result").innerHTML = `
+        <div class="icon">${icon}</div>
+        <div class="title ${response.statusType}">${response.title}</div>
+        <div class="name">${response.name || ""}</div>
+        <div class="details">
+          ${response.category ? "Category: " + response.category + "<br>" : ""}
+          ${response.table ? "Table: " + response.table + "<br>" : ""}
+          ${response.message || ""}
+        </div>
+        <button onclick="resetScanner()">SCAN NEXT</button>
+      `;
+
+      setTimeout(resetScanner, 5000);
+    }
+
+    function showError(title, message) {
+      document.getElementById("result").innerHTML = `
+        <div class="icon">❌</div>
+        <div class="title error">${title}</div>
+        <div class="details">${message}</div>
+      `;
+    }
+
+    function resetScanner() {
+      isProcessing = false;
+      document.getElementById("result").innerHTML = `
+        <div class="icon">📷</div>
+        <div class="title waiting">READY TO SCAN</div>
+        <div class="details">Point the camera at the next guest invitation QR code.</div>
+      `;
+    }
+
+    startScanner();
+  </script>
 </body>
 </html>
