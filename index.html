@@ -248,13 +248,16 @@
       const result = document.getElementById("result");
       result.className = cardClass;
 
+      const guestType = response.guestType || response.category || "";
+      const admission = response.admission || response.table || "";
+
       result.innerHTML = `
         <div class="icon ${status}">${icon}</div>
         <div class="title ${status}">${response.title || "UNKNOWN STATUS"}</div>
         <div class="name">${response.name || ""}</div>
         <div class="details">
-          ${response.category ? "Category: " + response.category + "<br>" : ""}
-          ${response.table ? "Table: " + response.table + "<br>" : ""}
+          ${guestType ? "Guest Type: " + guestType + "<br>" : ""}
+          ${admission ? "Admission: " + admission + "<br>" : ""}
           ${response.message || ""}
           <div class="countdown">
             Returning to scanner in<br>
